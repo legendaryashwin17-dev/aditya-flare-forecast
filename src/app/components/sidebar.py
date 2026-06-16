@@ -1,32 +1,32 @@
-"""
-Sidebar component for file upload, PRADAN download, and controls.
-"""
+"""Premium sidebar component."""
 
 import streamlit as st
-from pathlib import Path
 
 
 def render_sidebar():
-    """Render the sidebar with file upload, PRADAN download, and controls.
-
-    Returns dict with user selections.
-    """
     with st.sidebar:
-        st.image(
-            "https://www.ursc.gov.in/sites/default/files/uploads/hel1os_0.png",
-            width=200,
-            use_container_width=True,
-        )
-        st.title("Aditya-L1 Flare Forecast")
-        st.caption("SoLEXS + HEL1OS Real-Time Analysis")
+        st.markdown("""
+        <div style="padding: 1.5rem 0 1rem 0;">
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;">
+                <div style="width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,#00ffaa,#0088ff);
+                    display:flex;align-items:center;justify-content:center;font-size:1.1rem;">☀</div>
+                <div>
+                    <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1rem;
+                        color:#e8e8ec;letter-spacing:-0.02em;">Aditya-L1</div>
+                    <div style="font-family:'Geist Mono',monospace;font-size:0.6rem;letter-spacing:0.1em;
+                        text-transform:uppercase;color:#4a4a5a;">Flare Forecast</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-        st.divider()
+        st.markdown('<div style="height:1px;background:rgba(255,255,255,0.06);margin:0.5rem 0;"></div>',
+                    unsafe_allow_html=True)
 
-        # Data source selection
         data_mode = st.radio(
             "Data Source",
             ["Simulated Flares", "Download from PRADAN", "Upload FITS Files"],
-            help="Use simulated data, download from PRADAN, or upload your own FITS files",
+            help="Choose your data source",
         )
 
         solexs_file = None
@@ -35,69 +35,40 @@ def render_sidebar():
         pradan_pass = None
 
         if data_mode == "Download from PRADAN":
-            st.subheader("PRADAN Credentials")
-            pradan_user = st.text_input(
-                "Username",
-                value="ashwani___chaurasia",
-                help="ISSDC PRADAN portal username",
-            )
-            pradan_pass = st.text_input(
-                "Password",
-                type="password",
-                value="Carnage.acsb007",
-                help="ISSDC PRADAN portal password",
-            )
-            st.info(
-                "Downloads latest SoLEXS + HEL1OS data from "
-                "[PRADAN](https://pradan.issdc.gov.in). "
-                "FITS files are saved to `data/pradan/`."
-            )
+            st.markdown('<div style="font-family:\'Geist Mono\',monospace;font-size:0.65rem;letter-spacing:0.1em;'
+                        'text-transform:uppercase;color:#4a4a5a;margin:0.75rem 0 0.5rem 0;">Credentials</div>',
+                        unsafe_allow_html=True)
+            pradan_user = st.text_input("Username", value="ashwani___chaurasia")
+            pradan_pass = st.text_input("Password", type="password", value="Carnage.acsb007")
 
         elif data_mode == "Upload FITS Files":
-            st.subheader("Upload Data Files")
-            solexs_file = st.file_uploader(
-                "SoLEXS FITS (2-22 keV)",
-                type=["fits", "fit"],
-                help="Level-1 SoLEXS data from ISSDC PRADAN",
-            )
-            hel1os_file = st.file_uploader(
-                "HEL1OS FITS (8-150 keV)",
-                type=["fits", "fit"],
-                help="Level-1 HEL1OS data from ISSDC PRADAN",
-            )
+            st.markdown('<div style="font-family:\'Geist Mono\',monospace;font-size:0.65rem;letter-spacing:0.1em;'
+                        'text-transform:uppercase;color:#4a4a5a;margin:0.75rem 0 0.5rem 0;">Upload</div>',
+                        unsafe_allow_html=True)
+            solexs_file = st.file_uploader("SoLEXS FITS", type=["fits", "fit"])
+            hel1os_file = st.file_uploader("HEL1OS FITS", type=["fits", "fit"])
 
-        st.divider()
+        st.markdown('<div style="height:1px;background:rgba(255,255,255,0.06);margin:0.75rem 0;"></div>',
+                    unsafe_allow_html=True)
 
-        # Model selection
         model_mode = st.radio(
             "Model",
             ["Pre-trained Checkpoint", "Retrain on Data"],
-            help="Use saved model or train on uploaded data",
         )
 
-        st.divider()
+        with st.expander("Advanced"):
+            confidence_threshold = st.slider("Alert Threshold", 0.1, 0.9, 0.3, 0.05)
+            window_minutes = st.slider("Input Window (min)", 30, 120, 60, 15)
 
-        # Advanced options
-        with st.expander("Advanced Options"):
-            confidence_threshold = st.slider(
-                "Alert Threshold",
-                min_value=0.1,
-                max_value=0.9,
-                value=0.3,
-                step=0.05,
-                help="Probability above which to show alert",
-            )
-            window_minutes = st.slider(
-                "Input Window (min)",
-                min_value=30,
-                max_value=120,
-                value=60,
-                step=15,
-                help="Lookback window for model input",
-            )
+        st.markdown('<div style="height:1px;background:rgba(255,255,255,0.06);margin:0.75rem 0;"></div>',
+                    unsafe_allow_html=True)
 
-        st.divider()
-        st.caption("Bharatiya Antariksh Hackathon 2026")
+        st.markdown("""
+        <div style="font-family:'Geist Mono',monospace;font-size:0.6rem;letter-spacing:0.1em;
+            text-transform:uppercase;color:#4a4a5a;text-align:center;padding:0.5rem 0;">
+            Bharatiya Antariksh Hackathon 2026
+        </div>
+        """, unsafe_allow_html=True)
 
     return {
         "data_mode": data_mode,
