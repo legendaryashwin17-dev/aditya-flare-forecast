@@ -18,8 +18,8 @@ COLORS = {
 }
 
 
-def _base_layout(height=600, **kwargs):
-    return dict(
+def _base_layout(height=600, xaxis_update=None, yaxis_update=None, **kwargs):
+    layout = dict(
         height=height,
         template="plotly_dark",
         paper_bgcolor=COLORS["bg"],
@@ -32,8 +32,13 @@ def _base_layout(height=600, **kwargs):
         ),
         xaxis=dict(gridcolor=COLORS["grid"], zerolinecolor=COLORS["grid"]),
         yaxis=dict(gridcolor=COLORS["grid"], zerolinecolor=COLORS["grid"]),
-        **kwargs,
     )
+    if xaxis_update:
+        layout["xaxis"].update(xaxis_update)
+    if yaxis_update:
+        layout["yaxis"].update(yaxis_update)
+    layout.update(kwargs)
+    return layout
 
 
 def plot_light_curves(solexs_df, hel1os_df, predictions=None,
@@ -119,7 +124,7 @@ def plot_forecast_bars(summary: dict):
     fig.update_layout(**_base_layout(
         height=250,
         title=dict(text="Flare Probability by Horizon", font=dict(size=13, color="#e8e8ec")),
-        barmode="overlay", xaxis=dict(range=[0, 1]),
+        barmode="overlay", xaxis_update=dict(range=[0, 1]),
     ))
     return fig
 
