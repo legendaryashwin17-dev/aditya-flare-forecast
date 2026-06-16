@@ -1,0 +1,27 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.env
+
+# Data files (too large for git)
+data/pradan/
+data/pradan_solexs/
+data/pradan_hel1os/
+data/raw/
+data/processed/
+*.zip
+*.gz
+
+# Models
+data/models/*.pt
+
+# Outputs
+outputs/
+
+# IDE
+.vscode/
+.idea/

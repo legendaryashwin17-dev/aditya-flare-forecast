@@ -1,0 +1,182 @@
+# =============================================================================
+# Configuration for Aditya-L1 Solar Flare Forecasting & Nowcasting
+# OPTIMIZED for small dataset (July 2024 onward)
+# Architecture: Parallel 1D-CNN branches + Overlap Conv + BiLSTM + Multi-Head
+# Target: TSS >= 0.65 on >=C-class flares | Lead-time curve: 15/30/60 min
+#
+# References:
+#   Nandi et al. 2025 (HEL1OS), Sarwade et al. 2025 (SoLEXS),
+#   Hassani et al. 2025 (TSS=0.74 benchmark), Lin et al. 2017 (Focal Loss)
+# =============================================================================
+
+data:
+  # === PRIMARY: Aditya-L1 SoLEXS + HEL1OS (ISSDC PRADAN) ===
+  primary_data_source: "aditya_l1"
+  aditya_l1:
+    solexs_level: "L1"
+    hel1os_level: "L1"
+    native_cadence_seconds: 1
+    binning_cadence_seconds: 10  # downsampled from 1s to 10s
+    energy_ranges:
+      solexs_all: [2, 22]           # keV — full SoLEXS range
+      solexs_soft: [2, 8]           # keV — softest band (thermal)
+      overlap_band: [8, 22]         # keV — SoLEXS+HEL1OS overlap (precursor!)
+      hel1os_hard: [22, 150]        # keV — hardest HEL1OS band (non-thermal)
+      hel1os_all: [8, 150]          # keV — full HEL1OS range
+
+  # === SUPPLEMENTARY: GOES XRS (transfer learning pre-training) ===
+  supplementary:
+    goes:
+      enabled: true
+      start_date: "2003-01-01"
+      end_date: "2023-12-31"
+      cadence_seconds: 60
+      # GOES XRS-A (0.5-4 A) -> hard channel proxy
+      # GOES XRS-B (1-8 A)   -> soft channel proxy
+
+  # Train/val/test split (chronological)
+  train_split: 0.80
+  val_split: 0.10
+  test_split: 0.10
+
+  # Sliding window parameters
+  input_window_minutes: 60
+  input_window_steps: 360  # 60 min * 60 s/min / 10 s/step
+  forecast_horizons_minutes: [15, 30, 60]
+  sliding_stride_minutes: 5
+  sliding_stride_steps: 30  # 5 min * 60 / 10
+
+  # Flare classes
+  min_flare_class: "C"  # >=C-class considered positive
+
+preprocessing:
+  binning_cadence: 10          # seconds
+  log_transform: true
+  standardize: true
+  fill_method: "ffill"
+  max_gap_seconds: 300
+  background_percentile: 10
+  smoothing_window_minutes: 1
+
+features:
+  # Which features go to the SoLEXS branch (by index in feature vector)
+  soft_channels:
+    - "solexs_flux"
+    - "solexs_flux_log"
+    - "dsoft_dt_30s"
+    - "dsoft_dt_2min"
+    - "soft_rolling_mean_1min"
+    - "soft_rolling_std_1min"
+    - "background_subtracted_soft"
+
+  hard_channels:
+    - "hel1os_flux"
+    - "hel1os_flux_log"
+    - "spectral_hardness_ratio"
+    - "dhard_dt_30s"
+    - "dhard_dt_2min"
+    - "overlap_xcorr"
+    - "hard_rolling_mean_1min"
+    - "hard_rolling_std_1min"
+    - "hard_rolling_mean_5min"
+    - "background_subtracted_hard"
+
+  # 8-22 keV overlap-specific features (key innovation)
+  overlap_features:
+    - "spectral_hardness_ratio"
+    - "overlap_xcorr"
+
+model:
+  architecture: "Parallel1DCNN-BiLSTM-MultiHead"
+
+  # Parallel instrument branches (preserves sensor-specific noise)
+  solexs_branch:
+    filters: 32
+    kernel_size: 3
+    activation: "relu"
+    padding: "same"
+
+  hel1os_branch:
+    filters: 32
+    kernel_size: 3
+    activation: "relu"
+    padding: "same"
+
+  # Overlap synthesis layer (learns 8-22 keV cross-correlations)
+  overlap_conv:
+    filters: 64
+    kernel_size: 5  # larger receptive field for cross-instrument patterns
+    activation: "relu"
+    padding: "same"
+
+  # Recurrent layer
+  lstm:
+    layers: 1                # single layer to reduce overfitting on small data
+    hidden_size: 64          # reduced from 128
+    dropout: 0.0             # handled explicitly between LSTM and heads
+    bidirectional: true
+
+  # Multi-head output (independent for each forecast horizon)
+  heads:
+    units: [32]              # Dense(32) -> Dropout(0.4) -> Dense(1, sigmoid)
+    dropout: 0.4
+    activation: "relu"
+    n_horizons: 3            # 15, 30, 60 min
+
+training:
+  loss: "focal"
+  focal_alpha: 0.75
+  focal_gamma: 2.0
+
+  optimizer: "adam"
+  learning_rate: 0.001       # higher initial LR for faster convergence
+  weight_decay: 0.0001       # stronger L2 for small data
+
+  batch_size: 32             # smaller batch for better gradient estimates
+  max_epochs: 100
+  early_stopping_patience: 10     # monitor TSS, not loss
+  early_stopping_metric: "val_tss"
+
+  lr_scheduler: "reduce_on_plateau"
+  lr_factor: 0.5
+  lr_patience: 3                  # aggressive LR reduction on plateau
+
+  oversample_flares: true
+  oversample_factor: 5
+
+  transfer_learning:
+    enabled: true
+    pretrain_on_goes: true
+    freeze_cnn_layers: true        # freeze early branches after pre-train
+    fine_tune_lr: 0.0001           # lower LR for fine-tuning
+
+evaluation:
+  metrics:
+    - "tss"
+    - "hss"
+    - "far"
+    - "pod"
+    - "pofd"
+    - "auc"
+    - "lead_time"
+    - "bss"
+
+  thresholds:
+    - 0.1
+    - 0.2
+    - 0.3
+    - 0.5
+    - 0.7
+
+nowcasting:
+  soft_channel_threshold_sigma: 3.0
+  hard_channel_threshold_sigma: 3.0
+  dFdt_threshold_sigma: 2.0
+  consecutive_samples: 3
+  cooldown_minutes: 15
+  merge_window_seconds: 60
+
+visualization:
+  dashboard_port: 8050
+  update_interval_ms: 5000
+  lookback_minutes: 120
