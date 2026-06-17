@@ -12,13 +12,15 @@ import io
 import json
 import logging
 import tempfile
+import time
 from pathlib import Path
 from typing import Optional
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
 import yaml
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -32,17 +34,55 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Aditya-L1 Solar Flare Forecast API",
-    description="AI-powered solar flare nowcasting and forecasting",
+    description="AI-powered solar flare nowcasting and forecasting from Aditya-L1 SoLEXS + HEL1OS",
     version="1.0.0",
 )
 
+# Security: Restrict CORS to known origins
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+# Security: Rate limiting (simple in-memory)
+_rate_limits = defaultdict(list)
+RATE_LIMIT_WINDOW = 60  # seconds
+RATE_LIMIT_MAX = 30  # requests per window
+
+
+def _check_rate_limit(request: Request) -> bool:
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    _rate_limits[client_ip] = [t for t in _rate_limits[client_ip] if now - t < RATE_LIMIT_WINDOW]
+    if len(_rate_limits[client_ip]) >= RATE_LIMIT_MAX:
+        return False
+    _rate_limits[client_ip].append(now)
+    return True
+
+
+# Security: File size limit
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
+
+# Security: Security headers middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
 
 
 def load_config():
@@ -73,20 +113,23 @@ def load_config():
 
 
 @app.get("/api/status")
-async def status():
+async def status(request: Request):
+    if not _check_rate_limit(request):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
     config = load_config()
     checkpoint = Path(__file__).parent / "data" / "models" / "best_model.pt"
     return {
         "status": "ok",
         "model_available": checkpoint.exists(),
-        "model_path": str(checkpoint),
         "architecture": config["model"]["architecture"],
         "horizons": config["data"]["forecast_horizons_minutes"],
     }
 
 
 @app.get("/api/model-info")
-async def model_info():
+async def model_info(request: Request):
+    if not _check_rate_limit(request):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
     results_path = Path(__file__).parent / "data" / "training_results.json"
     results = {}
     if results_path.exists():
@@ -108,27 +151,37 @@ async def model_info():
 
 @app.post("/api/forecast")
 async def forecast(
+    request: Request,
     solexs_file: Optional[UploadFile] = File(None),
     hel1os_file: Optional[UploadFile] = File(None),
 ):
-    """Upload FITS files and run inference."""
+    if not _check_rate_limit(request):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
     if not solexs_file and not hel1os_file:
         raise HTTPException(status_code=400, detail="Upload at least one FITS file")
 
     config = load_config()
-
     solexs_path = hel1os_path = None
 
     try:
         if solexs_file:
             content = await solexs_file.read()
-            suffix = ".lc" if solexs_file.filename and solexs_file.filename.endswith(".lc") else ".fits"
+            if len(content) > MAX_FILE_SIZE:
+                raise HTTPException(status_code=413, detail="File too large (max 100MB)")
+            if not solexs_file.filename:
+                raise HTTPException(status_code=400, detail="Filename required")
+            suffix = ".lc" if solexs_file.filename.endswith(".lc") else ".fits"
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False, prefix="solexs_") as f:
                 f.write(content)
                 solexs_path = f.name
 
         if hel1os_file:
             content = await hel1os_file.read()
+            if len(content) > MAX_FILE_SIZE:
+                raise HTTPException(status_code=413, detail="File too large (max 100MB)")
+            if not hel1os_file.filename:
+                raise HTTPException(status_code=400, detail="Filename required")
             with tempfile.NamedTemporaryFile(suffix=".fits", delete=False, prefix="hel1os_") as f:
                 f.write(content)
                 hel1os_path = f.name
@@ -164,9 +217,11 @@ async def forecast(
             "predictions": predictions.to_dict(orient="records"),
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Forecast error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         if solexs_path:
             Path(solexs_path).unlink(missing_ok=True)
@@ -176,15 +231,23 @@ async def forecast(
 
 @app.post("/api/forecast/simulated")
 async def forecast_simulated(
+    request: Request,
     duration_hours: float = 24.0,
     n_flares: int = 5,
-    seed: int = 42,
 ):
-    """Generate simulated forecast for demo."""
+    if not _check_rate_limit(request):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
+    # Security: Validate parameters
+    if not (1.0 <= duration_hours <= 72.0):
+        raise HTTPException(status_code=400, detail="duration_hours must be 1-72")
+    if not (1 <= n_flares <= 20):
+        raise HTTPException(status_code=400, detail="n_flares must be 1-20")
+
     config = load_config()
 
     solexs_df, hel1os_df, flare_catalogue = generate_simulated_data(
-        duration_hours=duration_hours, n_flares=n_flares, seed=seed)
+        duration_hours=duration_hours, n_flares=n_flares)
 
     preprocessor = FlarePreprocessor(config)
     combined = preprocessor.unify_and_bin(solexs_df, hel1os_df, target_cadence_s=10)
@@ -216,8 +279,8 @@ async def forecast_simulated(
         for _, row in flare_catalogue.iterrows():
             catalogue.append({
                 "peak_time": str(row["peak_time"]),
-                "class": row.get("class", "C"),
-                "flux": float(row.get("flux", 1e-5)),
+                "class": row.get("goes_class", "C"),
+                "flux": float(row.get("peak_flux", 1e-5)),
             })
 
     return {
@@ -234,7 +297,7 @@ async def forecast_simulated(
 
 
 def _generate_simulated_predictions(timestamps, flare_catalogue):
-    rng = np.random.RandomState(42)
+    rng = np.random.RandomState()
     n_preds = max(1, len(timestamps) // 30)
     idx = np.linspace(0, len(timestamps) - 1, n_preds, dtype=int)
     pred_times = timestamps[idx]

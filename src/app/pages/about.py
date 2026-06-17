@@ -165,14 +165,23 @@ Dense(32) -&gt; Drop(0.4) -&gt; Dense(1, sigmoid)
         </div>
         """, unsafe_allow_html=True)
 
+        # Handle both old and new results formats
+        test_metrics = results.get("test_metrics", {})
+        if "mean_tss_across_horizons" in test_metrics:
+            mean_tss = test_metrics["mean_tss_across_horizons"]
+            mean_auc = test_metrics["mean_auc_across_horizons"]
+        else:
+            mean_tss = results.get('test_mean_tss', 0)
+            mean_auc = results.get('test_mean_auc', 0)
+
         st.markdown(f"""
         <div class="metric-row">
             <div class="metric-item">
-                <div class="metric-val">{results.get('test_mean_tss', 0):.4f}</div>
+                <div class="metric-val">{mean_tss:.4f}</div>
                 <div class="metric-label">Mean TSS</div>
             </div>
             <div class="metric-item">
-                <div class="metric-val">{results.get('test_mean_auc', 0):.4f}</div>
+                <div class="metric-val">{mean_auc:.4f}</div>
                 <div class="metric-label">Mean AUC</div>
             </div>
             <div class="metric-item">
@@ -180,8 +189,8 @@ Dense(32) -&gt; Drop(0.4) -&gt; Dense(1, sigmoid)
                 <div class="metric-label">Best Val TSS</div>
             </div>
             <div class="metric-item">
-                <div class="metric-val">{results.get('n_params', 0):,}</div>
-                <div class="metric-label">Parameters</div>
+                <div class="metric-val">{results.get('mode', 'unknown')}</div>
+                <div class="metric-label">Training Mode</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -218,8 +227,8 @@ Dense(32) -&gt; Drop(0.4) -&gt; Dense(1, sigmoid)
             border-radius:var(--radius-lg);">
             <span style="font-family:'Geist Mono',monospace;font-size:0.65rem;color:var(--accent);">01</span>
             <span style="font-size:0.9rem;color:var(--text-secondary);margin-left:0.75rem;">
-                <strong style="color:var(--text-primary);">Nandi et al. 2025</strong> —
-                HEL1OS pre-flare precursor brightening in 8-22 keV band
+                <strong style="color:var(--text-primary);">Hassani et al. 2025</strong> —
+                LSTM solar flare prediction, TSS=0.74 on GOES XRS (2003-2023)
             </span>
         </div>
         <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border-subtle);
@@ -227,20 +236,12 @@ Dense(32) -&gt; Drop(0.4) -&gt; Dense(1, sigmoid)
             <span style="font-family:'Geist Mono',monospace;font-size:0.65rem;color:var(--accent);">02</span>
             <span style="font-size:0.9rem;color:var(--text-secondary);margin-left:0.75rem;">
                 <strong style="color:var(--text-primary);">Sarwade et al. 2025</strong> —
-                SoLEXS instrument design and calibration
+                SoLEXS instrument design and calibration on Aditya-L1
             </span>
         </div>
         <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border-subtle);
             border-radius:var(--radius-lg);">
             <span style="font-family:'Geist Mono',monospace;font-size:0.65rem;color:var(--accent);">03</span>
-            <span style="font-size:0.9rem;color:var(--text-secondary);margin-left:0.75rem;">
-                <strong style="color:var(--text-primary);">Hassani et al. 2025</strong> —
-                TSS=0.74 benchmark on GOES XRS (2003-2023)
-            </span>
-        </div>
-        <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border-subtle);
-            border-radius:var(--radius-lg);">
-            <span style="font-family:'Geist Mono',monospace;font-size:0.65rem;color:var(--accent);">04</span>
             <span style="font-size:0.9rem;color:var(--text-secondary);margin-left:0.75rem;">
                 <strong style="color:var(--text-primary);">Lin et al. 2017</strong> —
                 Focal Loss for Dense Object Detection
@@ -248,10 +249,18 @@ Dense(32) -&gt; Drop(0.4) -&gt; Dense(1, sigmoid)
         </div>
         <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border-subtle);
             border-radius:var(--radius-lg);">
-            <span style="font-family:'Geist Mono',monospace;font-size:0.65rem;color:var(--accent);">05</span>
+            <span style="font-family:'Geist Mono',monospace;font-size:0.65rem;color:var(--accent);">04</span>
             <span style="font-size:0.9rem;color:var(--text-secondary);margin-left:0.75rem;">
                 <strong style="color:var(--text-primary);">Neupert Effect</strong> —
-                d(soft X-ray)/dt tracks hard X-ray flux
+                d(soft X-ray)/dt tracks hard X-ray flux (solar physics)
+            </span>
+        </div>
+        <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border-subtle);
+            border-radius:var(--radius-lg);">
+            <span style="font-family:'Geist Mono',monospace;font-size:0.65rem;color:var(--accent);">05</span>
+            <span style="font-size:0.9rem;color:var(--text-secondary);margin-left:0.75rem;">
+                <strong style="color:var(--text-primary);">ISRO Aditya-L1 Mission</strong> —
+                SoLEXS + HEL1OS instrument specifications and data
             </span>
         </div>
     </div>

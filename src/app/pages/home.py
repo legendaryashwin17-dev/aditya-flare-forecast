@@ -7,12 +7,12 @@ def render_home():
     # Noise overlay
     st.markdown('<div class="noise-overlay"></div>', unsafe_allow_html=True)
 
-    # Hero Section
+    # Hero Section - Left-aligned per design-taste-frontend rules
     st.markdown("""
     <div class="hero-container">
         <div class="hero-eyebrow">
             <span class="pulse-dot"></span>
-            Aditya-L1 Mission • SoLEXS + HEL1OS
+            Aditya-L1 Mission / SoLEXS + HEL1OS
         </div>
         <h1 class="hero-title">
             Solar Flare<br>
@@ -26,7 +26,7 @@ def render_home():
     </div>
     """, unsafe_allow_html=True)
 
-    # Stats Grid
+    # Stats Grid - Bento layout, 3 columns
     st.markdown("""
     <div class="stats-grid">
         <div class="stat-card">
@@ -45,19 +45,19 @@ def render_home():
             <div class="stat-desc">parameters</div>
         </div>
         <div class="stat-card">
-            <div class="stat-label">Best TSS</div>
-            <div class="stat-value accent">0.75</div>
-            <div class="stat-desc">@ 15 min horizon</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">Best AUC</div>
-            <div class="stat-value accent">0.91</div>
-            <div class="stat-desc">area under curve</div>
-        </div>
-        <div class="stat-card">
             <div class="stat-label">Features</div>
             <div class="stat-value">17</div>
             <div class="stat-desc">physics-informed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Data Source</div>
+            <div class="stat-value accent">PRADAN</div>
+            <div class="stat-desc">real Aditya-L1 data</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Loss Function</div>
+            <div class="stat-value">Focal</div>
+            <div class="stat-desc">alpha=0.75, gamma=2.0</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -110,7 +110,7 @@ def render_home():
     </div>
     """, unsafe_allow_html=True)
 
-    # Innovation Section
+    # Innovation Section - Double-bezel card
     st.markdown("""
     <div class="section-header" style="margin-top:3rem;">
         <div class="section-eyebrow">Key Innovation</div>
@@ -124,15 +124,15 @@ def render_home():
             <p style="color:var(--text-secondary);line-height:1.75;font-size:0.95rem;">
                 The model focuses on the <strong style="color:var(--accent);">8-22 keV overlap</strong>
                 between SoLEXS and HEL1OS, where <strong style="color:var(--text-primary);">pre-flare
-                precursor brightening</strong> has been observed (Nandi et al. 2025). This band provides
-                predictive information <strong style="color:var(--text-primary);">15-25 minutes before
-                flare onset</strong>, enabling the model to achieve TSS=0.75 at the 15-minute horizon.
+                precursor brightening</strong> may provide predictive information before flare onset.
+                The spectral hardness ratio between soft and hard X-ray bands captures the Neupert Effect
+                — where d(soft X-ray)/dt tracks hard X-ray emission.
             </p>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Getting Started
+    # Getting Started - Zig-zag layout
     st.markdown("""
     <div class="section-header" style="margin-top:3rem;">
         <div class="section-eyebrow">Get Started</div>
@@ -144,10 +144,10 @@ def render_home():
     <div class="pipeline-grid" style="grid-template-columns:1fr 1fr;">
         <div class="pipeline-step stagger-5">
             <div class="step-number">A</div>
-            <div class="step-title">Simulated Data</div>
+            <div class="step-title">Demo Mode</div>
             <div class="step-desc">
-                Click "Forecast" in the sidebar and select "Simulated Flares"
-                to see the model analyze synthetic flare events with pre-flare precursors.
+                Click "Forecast" in the sidebar. When no data is loaded,
+                the app shows a demo with simulated flare data for evaluation.
             </div>
         </div>
         <div class="pipeline-step stagger-6">

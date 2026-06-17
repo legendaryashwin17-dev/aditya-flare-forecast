@@ -78,7 +78,7 @@ def generate_simulated_data(
     duration_hours: float = 24.0,
     n_flares: int = 3,
     cadence_s: float = 10.0,
-    seed: int = 42,
+    seed: int = None,
     start_time: datetime = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Generate simulated SoLEXS + HEL1OS light curves with flares.
@@ -88,6 +88,8 @@ def generate_simulated_data(
         Each DataFrame has DatetimeIndex and flux column.
         Flare catalogue has columns: start_time, peak_time, end_time, goes_class, peak_flux
     """
+    if seed is None:
+        seed = int(np.random.randint(0, 100000))
     rng = np.random.RandomState(seed)
 
     if start_time is None:

@@ -1,6 +1,25 @@
 """Premium sidebar component."""
 
+import os
+from pathlib import Path
 import streamlit as st
+import yaml
+
+
+def _model_status():
+    """Check if a trained model checkpoint exists."""
+    ckpt = Path(__file__).parent.parent.parent.parent / "data" / "models" / "best_model.pt"
+    if not ckpt.exists():
+        return False, "No trained model found"
+    try:
+        import torch
+        ckpt_data = torch.load(ckpt, map_location="cpu", weights_only=False)
+        epoch = ckpt_data.get("epoch", "?")
+        val_tss = ckpt_data.get("val_tss", None)
+        tss_str = f", val_TSS={val_tss:.3f}" if val_tss is not None else ""
+        return True, f"Epoch {epoch}{tss_str}"
+    except Exception:
+        return True, "Checkpoint exists (unverified)"
 
 
 def render_sidebar():
@@ -23,10 +42,32 @@ def render_sidebar():
         st.markdown('<div style="height:1px;background:rgba(255,255,255,0.06);margin:0.5rem 0;"></div>',
                     unsafe_allow_html=True)
 
+        # --- Model status ---
+        model_ok, model_msg = _model_status()
+        if model_ok:
+            st.markdown(f"""
+            <div style="padding:0.5rem 0.75rem;border-radius:8px;background:rgba(0,255,170,0.08);
+                border:1px solid rgba(0,255,170,0.2);margin-bottom:0.75rem;">
+                <div style="font-family:'Geist Mono',monospace;font-size:0.6rem;letter-spacing:0.1em;
+                    text-transform:uppercase;color:#00ffaa;">Model Ready</div>
+                <div style="font-size:0.75rem;color:#888;margin-top:0.25rem;">{model_msg}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div style="padding:0.5rem 0.75rem;border-radius:8px;background:rgba(255,100,100,0.08);
+                border:1px solid rgba(255,100,100,0.2);margin-bottom:0.75rem;">
+                <div style="font-family:'Geist Mono',monospace;font-size:0.6rem;letter-spacing:0.1em;
+                    text-transform:uppercase;color:#ff6464;">No Model</div>
+                <div style="font-size:0.75rem;color:#888;margin-top:0.25rem;">Train or upload a checkpoint</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # --- Data Source ---
         data_mode = st.radio(
             "Data Source",
-            ["Simulated Flares", "Download from PRADAN", "Upload FITS Files"],
-            help="Choose your data source",
+            ["Upload FITS Files", "Download from PRADAN"],
+            help="Provide real Aditya-L1 data for forecasting",
         )
 
         solexs_file = None
@@ -36,10 +77,19 @@ def render_sidebar():
 
         if data_mode == "Download from PRADAN":
             st.markdown('<div style="font-family:\'Geist Mono\',monospace;font-size:0.65rem;letter-spacing:0.1em;'
-                        'text-transform:uppercase;color:#4a4a5a;margin:0.75rem 0 0.5rem 0;">Credentials</div>',
+                        'text-transform:uppercase;color:#4a4a5a;margin:0.75rem 0 0.5rem 0;">PRADAN Credentials</div>',
                         unsafe_allow_html=True)
-            pradan_user = st.text_input("Username", value="ashwani___chaurasia")
-            pradan_pass = st.text_input("Password", type="password", value="Carnage.acsb007")
+            pradan_user = st.text_input(
+                "Username",
+                value=os.environ.get("PRADAN_USERNAME", ""),
+                placeholder="Enter your PRADAN username",
+            )
+            pradan_pass = st.text_input(
+                "Password",
+                type="password",
+                value=os.environ.get("PRADAN_PASSWORD", ""),
+                placeholder="Enter your PRADAN password",
+            )
 
         elif data_mode == "Upload FITS Files":
             st.markdown('<div style="font-family:\'Geist Mono\',monospace;font-size:0.65rem;letter-spacing:0.1em;'
@@ -53,18 +103,13 @@ def render_sidebar():
             hel1os_file = st.file_uploader(
                 "HEL1OS FITS (lightcurve_*.fits only)",
                 type=["fits", "fit"],
-                help="Upload lightcurve_cdte*.fits or lightcurve_czt*.fits — NOT spectra or GTI",
+                help="Upload lightcurve_cdte*.fits or lightcurve_czt*.fits",
             )
 
         st.markdown('<div style="height:1px;background:rgba(255,255,255,0.06);margin:0.75rem 0;"></div>',
                     unsafe_allow_html=True)
 
-        model_mode = st.radio(
-            "Model",
-            ["Pre-trained Checkpoint", "Retrain on Data"],
-        )
-
-        with st.expander("Advanced"):
+        with st.expander("Advanced Settings"):
             confidence_threshold = st.slider("Alert Threshold", 0.1, 0.9, 0.3, 0.05)
             window_minutes = st.slider("Input Window (min)", 30, 120, 60, 15)
 
@@ -84,7 +129,8 @@ def render_sidebar():
         "hel1os_file": hel1os_file,
         "pradan_user": pradan_user,
         "pradan_pass": pradan_pass,
-        "model_mode": model_mode,
+        "model_mode": "Pre-trained Checkpoint",
         "confidence_threshold": confidence_threshold,
         "window_minutes": window_minutes,
+        "use_simulated": True,
     }
