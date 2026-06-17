@@ -13,8 +13,11 @@ data/pradan_solexs/
 data/pradan_hel1os/
 data/raw/
 data/processed/
+data/goes_historical/
 *.zip
 *.gz
+*.nc
+*.pyc
 
 # Models
 data/models/*.pt

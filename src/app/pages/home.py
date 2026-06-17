@@ -125,8 +125,14 @@ def render_home():
                 The model focuses on the <strong style="color:var(--accent);">8-22 keV overlap</strong>
                 between SoLEXS and HEL1OS, where <strong style="color:var(--text-primary);">pre-flare
                 precursor brightening</strong> may provide predictive information before flare onset.
-                The spectral hardness ratio between soft and hard X-ray bands captures the Neupert Effect
-                — where d(soft X-ray)/dt tracks hard X-ray emission.
+                The spectral hardness ratio between soft and hard X-ray bands captures
+                energy redistribution as flares develop.
+            </p>
+            <p style="color:var(--text-muted);font-size:0.8rem;margin-top:1rem;line-height:1.6;">
+                Note: Current data covers June 14-15, 2026. SoLEXS and HEL1OS
+                observations do not yet overlap temporally. The overlap-band features
+                are zero-padded in this mode. Download more data from PRADAN for
+                full dual-instrument operation.
             </p>
         </div>
     </div>

@@ -41,15 +41,38 @@ class FlarePreprocessor:
 
     def unify_and_bin(self, solexs: pd.DataFrame, hel1os: pd.DataFrame,
                       target_cadence_s: int = 10) -> pd.DataFrame:
-        """Unify SoLEXS and HEL1OS to common 10s time grid."""
+        """Unify SoLEXS and HEL1OS to common 10s time grid.
+
+        Handles non-overlapping data by forward-filling missing instruments
+        with zeros and marking the is_valid column accordingly.
+        """
         soft = self.bin_to_cadence(solexs, target_cadence_s)
         hard = self.bin_to_cadence(hel1os, target_cadence_s)
+
+        # Check temporal overlap
+        if not soft.empty and not hard.empty:
+            s_start, s_end = soft.index.min(), soft.index.max()
+            h_start, h_end = hard.index.min(), hard.index.max()
+            overlap_start = max(s_start, h_start)
+            overlap_end = min(s_end, h_end)
+            has_overlap = overlap_start < overlap_end
+            if not has_overlap:
+                logger.warning(
+                    f"No temporal overlap between SoLEXS ({s_start} to {s_end}) "
+                    f"and HEL1OS ({h_start} to {h_end}). "
+                    f"Proceeding with single-instrument fallback."
+                )
+
         combined = soft.join(hard, how="outer")
-        combined = combined.ffill().dropna()
-        if "solexs_flux" in combined.columns and "hel1os_flux" in combined.columns:
-            pass
-        elif len(combined.columns) >= 2:
-            combined.columns = ["solexs_flux", "hel1os_flux"][:len(combined.columns)]
+        # Fill missing instrument data with 0 (not ffill — that would create artifacts)
+        combined["solexs_flux"] = combined["solexs_flux"].fillna(0)
+        combined["hel1os_flux"] = combined["hel1os_flux"].fillna(0)
+
+        if "solexs_flux" not in combined.columns and len(combined.columns) >= 1:
+            combined.columns = ["solexs_flux"] + list(combined.columns[1:])
+        if "hel1os_flux" not in combined.columns and len(combined.columns) >= 2:
+            combined.columns = list(combined.columns[:1]) + ["hel1os_flux"] + list(combined.columns[2:])
+
         return combined
 
     def handle_gaps(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -71,13 +94,18 @@ class FlarePreprocessor:
         """Compute overlap-optimized physics features.
 
         Feature set targets the 8-22 keV overlap band where pre-flare
-        precursor brightening appears (Nandi et al. 2025).
+        precursor brightening may appear.
+
+        NOTE: spectral_hardness_ratio = HEL1OS(8-150 keV) / SoLEXS(2-22 keV).
+        This is an instrument-dependent ratio, not a true physical hardness ratio.
+        It captures instrument response differences as well as spectral changes.
+        A true hardness ratio would require overlapping energy bands from one instrument.
 
         Features:
             - Soft/hard flux (log-transformed)
-            - Spectral Hardness Ratio (HEL1OS overlap / SoLEXS soft)
+            - Spectral Hardness Ratio (instrument-dependent, see note above)
             - dF/dt at 30s and 2min windows
-            - Rolling Pearson correlation in overlap band
+            - Rolling Pearson correlation between instruments
             - Rolling statistics (1-min mean/std)
             - Background-subtracted fluxes
         """
@@ -137,6 +165,23 @@ class FlarePreprocessor:
         bg_hard = np.percentile(hard, self.bg_percentile)
         result["background_subtracted_soft"] = soft - bg_soft
         result["background_subtracted_hard"] = hard - bg_hard
+
+        # If one instrument is all zeros (no data), zero out its derived features
+        # to prevent garbage features from forward-filled/zero-filled data
+        if np.all(soft == 0):
+            for col in ["solexs_flux_log", "dsoft_dt_30s", "dsoft_dt_2min",
+                        "soft_rolling_mean_1min", "soft_rolling_std_1min",
+                        "background_subtracted_soft"]:
+                result[col] = 0.0
+            result["spectral_hardness_ratio"] = 0.0
+            result["overlap_xcorr"] = 0.0
+        if np.all(hard == 0):
+            for col in ["hel1os_flux_log", "dhard_dt_30s", "dhard_dt_2min",
+                        "hard_rolling_mean_1min", "hard_rolling_std_1min",
+                        "hard_rolling_mean_5min", "background_subtracted_hard"]:
+                result[col] = 0.0
+            result["spectral_hardness_ratio"] = 0.0
+            result["overlap_xcorr"] = 0.0
 
         valid_cols = [
             "solexs_flux", "hel1os_flux",
