@@ -100,19 +100,56 @@ def render_forecast_page(settings: dict):
         if settings["solexs_file"] or settings["hel1os_file"]:
             with st.spinner("Reading FITS files..."):
                 solexs_path = hel1os_path = None
+
+                # Validate SoLEXS filename
                 if settings["solexs_file"]:
-                    with tempfile.NamedTemporaryFile(suffix=".fits", delete=False) as f:
-                        f.write(settings["solexs_file"].getvalue())
-                        solexs_path = f.name
+                    sname = settings["solexs_file"].name.lower()
+                    if sname.endswith((".gti", ".evt", ".pha", ".spec")):
+                        st.error(f"Rejected '{settings['solexs_file'].name}': "
+                                 "This is not a light curve file. Upload a .lc file "
+                                 "(e.g., AL1_SOLEXS_*_L1.lc).")
+                    else:
+                        with tempfile.NamedTemporaryFile(
+                            suffix=".fits", delete=False,
+                            prefix="solexs_",
+                        ) as f:
+                            f.write(settings["solexs_file"].getvalue())
+                            solexs_path = f.name
+
+                # Validate HEL1OS filename
                 if settings["hel1os_file"]:
-                    with tempfile.NamedTemporaryFile(suffix=".fits", delete=False) as f:
-                        f.write(settings["hel1os_file"].getvalue())
-                        hel1os_path = f.name
-                try:
-                    solexs_df, hel1os_df = read_pair(solexs_path, hel1os_path)
-                    st.success(f"Loaded: SoLEXS {len(solexs_df)} pts, HEL1OS {len(hel1os_df)} pts")
-                except Exception as e:
-                    st.error(f"Error: {e}")
+                    hname = settings["hel1os_file"].name.lower()
+                    if hname.endswith((".gti", ".evt", ".pha", ".spec")):
+                        st.error(f"Rejected '{settings['hel1os_file'].name}': "
+                                 "This is not a light curve file. Upload a "
+                                 "lightcurve_cdte*.fits or lightcurve_czt*.fits file.")
+                    elif "lightcurve" not in hname:
+                        st.warning(f"'{settings['hel1os_file'].name}' doesn't look like "
+                                   "a lightcurve file. Will attempt to read anyway...")
+                        with tempfile.NamedTemporaryFile(
+                            suffix=".fits", delete=False,
+                            prefix="hel1os_",
+                        ) as f:
+                            f.write(settings["hel1os_file"].getvalue())
+                            hel1os_path = f.name
+                    else:
+                        with tempfile.NamedTemporaryFile(
+                            suffix=".fits", delete=False,
+                            prefix="hel1os_",
+                        ) as f:
+                            f.write(settings["hel1os_file"].getvalue())
+                            hel1os_path = f.name
+
+                if solexs_path or hel1os_path:
+                    try:
+                        solexs_df, hel1os_df = read_pair(solexs_path, hel1os_path)
+                        st.success(f"Loaded: SoLEXS {len(solexs_df)} pts, HEL1OS {len(hel1os_df)} pts")
+                    except Exception as e:
+                        st.error(f"Error reading FITS: {e}")
+                        st.info("Falling back to simulated data.")
+                        settings["data_mode"] = "Simulated Flares"
+                else:
+                    st.info("No valid FITS files selected. Using simulated data.")
                     settings["data_mode"] = "Simulated Flares"
         else:
             st.info("Upload FITS files or use simulated data.")

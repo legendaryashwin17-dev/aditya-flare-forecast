@@ -45,8 +45,16 @@ def render_sidebar():
             st.markdown('<div style="font-family:\'Geist Mono\',monospace;font-size:0.65rem;letter-spacing:0.1em;'
                         'text-transform:uppercase;color:#4a4a5a;margin:0.75rem 0 0.5rem 0;">Upload</div>',
                         unsafe_allow_html=True)
-            solexs_file = st.file_uploader("SoLEXS FITS", type=["fits", "fit"])
-            hel1os_file = st.file_uploader("HEL1OS FITS", type=["fits", "fit"])
+            solexs_file = st.file_uploader(
+                "SoLEXS FITS (.lc light curve only)",
+                type=["fits", "fit"],
+                help="Upload AL1_SOLEXS_*_L1.lc — NOT .gti or .evt files",
+            )
+            hel1os_file = st.file_uploader(
+                "HEL1OS FITS (lightcurve_*.fits only)",
+                type=["fits", "fit"],
+                help="Upload lightcurve_cdte*.fits or lightcurve_czt*.fits — NOT spectra or GTI",
+            )
 
         st.markdown('<div style="height:1px;background:rgba(255,255,255,0.06);margin:0.75rem 0;"></div>',
                     unsafe_allow_html=True)
