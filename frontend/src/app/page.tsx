@@ -143,10 +143,12 @@ export default function Home() {
           </div>
 
           <div className="animate-fade-slide-up delay-400 mt-10 flex flex-col sm:flex-row gap-4 justify-center">
-            <LiquidButton size="lg" className="text-base">
-              Launch Forecast
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </LiquidButton>
+            <a href="/dashboard">
+              <LiquidButton size="lg" className="text-base">
+                Launch Forecast
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </LiquidButton>
+            </a>
             <Button variant="outline" size="lg" className="border-white/10 text-white/70 hover:bg-white/5">
               View Pipeline
             </Button>
